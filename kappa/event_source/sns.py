@@ -31,13 +31,22 @@ class SNSEventSource(kappa.event_source.base.EventSource):
 
     def exists(self, function):
         try:
-            response = self._sns.call(
-                'list_subscriptions_by_topic',
-                TopicArn=self.arn)
+            response = self._sns.call('list_subscriptions')
             LOG.debug(response)
             for subscription in response['Subscriptions']:
                 if subscription['Endpoint'] == function.arn:
                     return subscription
+            # Loop through more subscriptions if they exist.
+            while 'NextToken' in response:
+                response = self._sns.call(
+                    'list_subscriptions',
+                    NextToken=response['NextToken'],
+                )
+                LOG.debug(response)
+                for subscription in response['Subscriptions']:
+                    if subscription['Endpoint'] == function.arn:
+                        return subscription
+
             return None
         except Exception:
             LOG.exception('Unable to find event source %s', self.arn)
